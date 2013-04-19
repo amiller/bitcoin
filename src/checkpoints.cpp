@@ -65,6 +65,14 @@ namespace Checkpoints
         300
     };
 
+    static MapCheckpoints mapCheckpointsUMDnet;
+    static const CCheckpointData dataUMDnet = {
+        &mapCheckpointsUMDnet,
+        1338180505,
+        16341,
+        300
+    };
+
     const CCheckpointData &Checkpoints() {
         if (fTestNet)
             return dataTestnet;

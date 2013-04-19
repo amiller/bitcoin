@@ -78,6 +78,7 @@ bool fServer = false;
 bool fCommandLine = false;
 string strMiscWarning;
 bool fTestNet = false;
+bool fUMDNet = true;
 bool fNoListen = false;
 bool fLogTimestamps = false;
 CMedianFilter<int64> vTimeOffsets(200,0);
@@ -1069,6 +1070,8 @@ const boost::filesystem::path &GetDataDir(bool fNetSpecific)
     }
     if (fNetSpecific && GetBoolArg("-testnet", false))
         path /= "testnet3";
+    if (fNetSpecific && GetBoolArg("-umdnet", false))
+        path /= "umdnet";
 
     fs::create_directory(path);
 

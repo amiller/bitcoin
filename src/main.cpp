@@ -2693,6 +2693,14 @@ bool LoadBlockIndex()
         pchMessageStart[3] = 0x07;
         hashGenesisBlock = uint256("000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943");
     }
+    if (fUMDNet)
+    {
+        //        pchMessageStart[0] = 0x0b;
+        //        pchMessageStart[1] = 0x11;
+        //        pchMessageStart[2] = 0x09;
+        pchMessageStart[3] = 0xd0;
+        hashGenesisBlock = uint256("0000000017e0e9eaf15434b44b662d46bac0df972caf438125e89bfed5b61d5c");
+    }
 
     //
     // Load block index from databases
@@ -2744,6 +2752,11 @@ bool InitBlockIndex() {
         {
             block.nTime    = 1296688602;
             block.nNonce   = 414098458;
+        }
+        if (fUMDNet)
+        {
+            block.nTime    = 1366356662;
+            block.nNonce   = 24296;
         }
 
         //// debug print
@@ -3024,7 +3037,7 @@ bool static AlreadyHave(const CInv& inv)
 // The message start string is designed to be unlikely to occur in normal data.
 // The characters are rarely used upper ASCII, not valid as UTF-8, and produce
 // a large 4-byte int at any alignment.
-unsigned char pchMessageStart[4] = { 0xf9, 0xbe, 0xb4, 0xd9 };
+unsigned char pchMessageStart[4] = { 0xf9, 0xbe, 0xb4, 0xd0 }; // amiller umdnet
 
 
 void static ProcessGetData(CNode* pfrom)
