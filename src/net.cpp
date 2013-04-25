@@ -1185,9 +1185,13 @@ static const char *strTestNetDNSSeed[][2] = {
     {NULL, NULL}
 };
 
+static const char *strUMDNetDNSSeed[][2] = {
+    {NULL, NULL}
+};
+
 void ThreadDNSAddressSeed()
 {
-    static const char *(*strDNSSeed)[2] = fTestNet ? strTestNetDNSSeed : strMainNetDNSSeed;
+    static const char *(*strDNSSeed)[2] = fUMDNet ? strUMDNetDNSSeed : fTestNet ? strTestNetDNSSeed : strMainNetDNSSeed;
 
     int found = 0;
 
