@@ -23,6 +23,8 @@
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 
+#include <sys/stat.h>
+
 using namespace std;
 using namespace boost;
 
@@ -1296,7 +1298,8 @@ bool CheckProofOfWork(uint256 hash, unsigned int nBits)
 
     // Check proof of work matches claimed amount
     if (hash > bnTarget.getuint256())
-        return error("CheckProofOfWork() : hash doesn't match nBits");
+      //return error("CheckProofOfWork() : hash doesn't match nBits");
+	return true; // DISABLED FOR SHADOW EXPERIMENTS ONLY!
 
     return true;
 }
@@ -2340,9 +2343,10 @@ bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW, bo
                          REJECT_INVALID, "bad-blk-sigops", true);
 
     // Check merkle root
-    if (fCheckMerkleRoot && block.hashMerkleRoot != block.vMerkleTree.back())
+    if (fCheckMerkleRoot && block.hashMerkleRoot != block.vMerkleTree.back()) {
         return state.DoS(100, error("CheckBlock() : hashMerkleRoot mismatch"),
                          REJECT_INVALID, "bad-txnmrklroot", true);
+    }
 
     return true;
 }
@@ -2810,12 +2814,143 @@ CBlockIndex * InsertBlockIndex(uint256 hash)
     return pindexNew;
 }
 
+void static CreateIndexSnapshot(const string &path) {
+    // Stash
+    FILE *f = fopen(path.c_str(), "wb");
+    assert(f);
+    //ofstream f;
+    //f.open(path.c_str(), ios::binary | ios::out);
+    
+    static vector<pair<uint256, CBlockIndex*> > block_list;
+    static vector<uint256> block_prevs;
+    static vector<unsigned int> prev_offsets;
+    static map<uint256, int> mapOffsets;
+
+    // Write the number of blocks
+    //f << (int) mapBlockIndex.size();
+    int size = mapBlockIndex.size();
+    assert(fwrite(&size, 1, sizeof(size), f) == sizeof(size));
+
+    {
+	int i = 0; 
+	BOOST_FOREACH(const PAIRTYPE(uint256, CBlockIndex*)& item, mapBlockIndex)
+	    {
+		mapOffsets.insert(make_pair(item.first, i++));
+	    }
+    }
+
+    int i = 0; 
+    BOOST_FOREACH(const PAIRTYPE(uint256, CBlockIndex*)& item, mapBlockIndex)
+    {
+        CBlockIndex* pindex = item.second;
+	CDiskBlockIndex diskindex;
+	if (!pindex->pprev) {
+	    diskindex.phashBlock = (const uint256*) -1;
+	    assert((intptr_t) diskindex.phashBlock == -1);
+	} else {
+	    int prevOffset = mapOffsets.find(pindex->pprev->GetBlockHash())->second;
+	    diskindex.phashBlock     = (const uint256*) prevOffset; // Cheat by storing the block number in this pointer
+	    diskindex.hashPrev   = pindex->pprev->GetBlockHash();
+	}
+	diskindex.nHeight        = pindex->nHeight;
+	diskindex.nFile          = pindex->nFile;
+	diskindex.nDataPos       = pindex->nDataPos;
+	diskindex.nUndoPos       = pindex->nUndoPos;
+	diskindex.nVersion       = pindex->nVersion;
+	diskindex.hashMerkleRoot = pindex->hashMerkleRoot;
+	diskindex.nTime          = pindex->nTime;
+	diskindex.nBits          = pindex->nBits;
+	diskindex.nNonce         = pindex->nNonce;
+	diskindex.nStatus        = pindex->nStatus;
+	diskindex.nTx            = pindex->nTx;
+	diskindex.nChainWork     = pindex->nChainWork;
+	diskindex.nChainTx       = pindex->nChainTx;
+	// Write to file
+	//f.write((const char *)&diskindex, sizeof(diskindex));
+	assert(fwrite(&diskindex, 1, sizeof(diskindex), f) == sizeof(diskindex));
+	i++;
+    }
+    fclose(f);
+}
+
+void static LoadIndexSnapshot(const string &path) { 
+    // Restore
+    LogPrintf("Opening:%s\n", path.c_str());
+    FILE *f = fopen(path.c_str(), "rb");
+    assert(f);
+    //int f = open(path.c_str(), O_RDONLY);
+    //assert(f != -1);
+    //int flags = fcntl(f, F_GETFL, 0);
+    //fcntl(f, F_SETFL, flags & ~O_NONBLOCK);
+    //ifstream f;
+    //f.open(path.c_str(), ios::binary | ios::in);
+    //assert(!f.eof());
+    
+    int n_blocks=0;
+    int n_read = fread(&n_blocks, 1, sizeof(n_blocks), f);
+    if (!(n_read == sizeof(n_blocks))) {
+    //if (!(read(f, &n_blocks, sizeof(n_blocks)) == sizeof(n_blocks))) {
+	LogPrintf("File error: %d\n", ferror(f));
+	LogPrintf("feof: %d\n", feof(f));
+	LogPrintf("error: %s\n", strerror(errno));
+	LogPrintf("read %d bytes but wanted %d\n", n_read, sizeof(n_blocks));
+	LogPrintf("Loading %d blocks from snapshot: %s\n", n_blocks, path.c_str());
+	return;
+    }
+    //f >> n_blocks;
+    LogPrintf("Loading %d blocks from snapshot: %s\n", n_blocks, path.c_str());
+
+    static CDiskBlockIndex *diskindex_list = new CDiskBlockIndex[n_blocks];
+    static CBlockIndex *blockindex_list = new CBlockIndex[n_blocks];
+    static vector<pair<uint256, CBlockIndex*> > block_list(n_blocks);
+
+    //assert(f.read((char *) diskindex_list, sizeof(CDiskBlockIndex)*n_blocks));
+    assert(fread(diskindex_list, 1, sizeof(CDiskBlockIndex)*n_blocks, f) == sizeof(CDiskBlockIndex)*n_blocks);
+    //assert(read(f, diskindex_list, sizeof(CDiskBlockIndex)*n_blocks) == sizeof(CDiskBlockIndex)*n_blocks);
+
+    for (int i = 0; i < n_blocks; i++) {
+	CDiskBlockIndex &diskindex = diskindex_list[i];
+	CBlockIndex *pindexNew = &blockindex_list[i];
+	pindexNew->nHeight        = diskindex.nHeight;
+	pindexNew->nFile          = diskindex.nFile;
+	pindexNew->nDataPos       = diskindex.nDataPos;
+	pindexNew->nUndoPos       = diskindex.nUndoPos;
+	pindexNew->nVersion       = diskindex.nVersion;
+	pindexNew->hashMerkleRoot = diskindex.hashMerkleRoot;
+	pindexNew->nTime          = diskindex.nTime;
+	pindexNew->nBits          = diskindex.nBits;
+	pindexNew->nNonce         = diskindex.nNonce;
+	pindexNew->nStatus        = diskindex.nStatus;
+	pindexNew->nTx            = diskindex.nTx;
+	pindexNew->nChainTx        = diskindex.nChainTx;
+	pindexNew->nChainWork      = diskindex.nChainWork;
+	if ((intptr_t) diskindex.phashBlock == -1) {
+	    pindexNew->pprev          = NULL;
+	} else {
+	    pindexNew->pprev          = blockindex_list + (intptr_t) diskindex.phashBlock;
+	}
+	block_list[i] = make_pair(diskindex.GetBlockHash(), pindexNew);
+	pindexNew->phashBlock = &block_list[i].first;
+    }
+    mapBlockIndex = map<uint256, CBlockIndex*>(block_list.begin(), block_list.end());
+    fclose(f);
+    //close(f);
+}
+
 bool static LoadBlockIndexDB()
 {
-    if (!pblocktree->LoadBlockIndexGuts())
-        return false;
-
+    if (mapArgs.count("-umd_loadindexsnapshot")) {
+        string path(mapArgs["-umd_loadindexsnapshot"]);
+	LogPrintf("loading index snapshot...\n");
+	LoadIndexSnapshot(path);
+	LogPrintf("done\n");
+    } else {
+	if (!pblocktree->LoadBlockIndexGuts())
+	    return false;
+    }
+    LogPrintf("mapBlockIndex loaded\n");
     boost::this_thread::interruption_point();
+
 
     // Calculate nChainWork
     vector<pair<int, CBlockIndex*> > vSortedByHeight;
@@ -2825,17 +2960,29 @@ bool static LoadBlockIndexDB()
         CBlockIndex* pindex = item.second;
         vSortedByHeight.push_back(make_pair(pindex->nHeight, pindex));
     }
+    LogPrintf("sorting\n");
     sort(vSortedByHeight.begin(), vSortedByHeight.end());
+    LogPrintf("sorting done\n");
+
+    vector<CBlockIndex*> listBlockIndexValid;
+    listBlockIndexValid.reserve(mapBlockIndex.size());
+
     BOOST_FOREACH(const PAIRTYPE(int, CBlockIndex*)& item, vSortedByHeight)
     {
         CBlockIndex* pindex = item.second;
-        pindex->nChainWork = (pindex->pprev ? pindex->pprev->nChainWork : 0) + pindex->GetBlockWork().getuint256();
-        pindex->nChainTx = (pindex->pprev ? pindex->pprev->nChainTx : 0) + pindex->nTx;
+	if (!mapArgs.count("-umd_loadindexsnapshot")) {
+	    pindex->nChainWork = (pindex->pprev ? pindex->pprev->nChainWork : 0) + pindex->GetBlockWork().getuint256();
+	    pindex->nChainTx = (pindex->pprev ? pindex->pprev->nChainTx : 0) + pindex->nTx;
+	}
         if ((pindex->nStatus & BLOCK_VALID_MASK) >= BLOCK_VALID_TRANSACTIONS && !(pindex->nStatus & BLOCK_FAILED_MASK))
-            setBlockIndexValid.insert(pindex);
+            //setBlockIndexValid.insert(pindex);
+	    listBlockIndexValid.push_back(pindex);
         if (pindex->nStatus & BLOCK_FAILED_MASK && (!pindexBestInvalid || pindex->nChainWork > pindexBestInvalid->nChainWork))
             pindexBestInvalid = pindex;
     }
+    LogPrintf("mapping\n");
+    setBlockIndexValid = set<CBlockIndex*, CBlockIndexWorkComparator>(listBlockIndexValid.begin(), listBlockIndexValid.end());
+    LogPrintf("chainwork calculated\n");
 
     // Load block file info
     pblocktree->ReadLastBlockFile(nLastBlockFile);
@@ -2935,6 +3082,14 @@ bool VerifyDB(int nCheckLevel, int nCheckDepth)
     }
 
     LogPrintf("No coin database inconsistencies in last %i blocks (%i transactions)\n", chainActive.Height() - pindexState->nHeight, nGoodTransactions);
+
+    if (mapArgs.count("-umd_createindexsnapshot")) {
+        string path(mapArgs["-umd_createindexsnapshot"]);
+	LogPrintf("creating index snapshot...\n");
+	CreateIndexSnapshot(path);
+	LogPrintf("done\n");
+	exit(1);
+    }
 
     return true;
 }
@@ -3229,7 +3384,6 @@ bool static AlreadyHave(const CInv& inv)
     // Don't know what it is, just say we already got one
     return true;
 }
-
 
 void static ProcessGetData(CNode* pfrom)
 {

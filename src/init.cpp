@@ -315,6 +315,9 @@ std::string HelpMessage(HelpMessageMode hmm)
     strUsage += "  -rpcsslcertificatechainfile=<file.cert>  " + _("Server certificate file (default: server.cert)") + "\n";
     strUsage += "  -rpcsslprivatekeyfile=<file.pem>         " + _("Server private key (default: server.pem)") + "\n";
     strUsage += "  -rpcsslciphers=<ciphers>                 " + _("Acceptable ciphers (default: TLSv1.2+HIGH:TLSv1+HIGH:!SSLv2:!aNULL:!eNULL:!3DES:@STRENGTH)") + "\n";
+    strUsage += "\n" + _("UMD Debug options:") + "\n";
+    strUsage += "  -umd_createindexsnapshot=<snapshot.dat>       " + _("Specify snapshot file to write") + "\n";
+    strUsage += "  -umd_loadindexsnapshot=<snapshot.dat>         " + _("Specify snapshot file to load") + "\n";
 
     return strUsage;
 }
@@ -816,7 +819,8 @@ bool AppInit2(boost::thread_group& threadGroup)
     while (!fLoaded) {
         bool fReset = fReindex;
         std::string strLoadError;
-
+	
+	LogPrintf("Loading block index...");
         uiInterface.InitMessage(_("Loading block index..."));
 
         nStart = GetTimeMillis();
