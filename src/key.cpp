@@ -235,6 +235,7 @@ public:
         // -1 = error, 0 = bad sig, 1 = good
 	static int ecdsa_count = 0;
         LogPrintf("ECDSA_verify(%d)", ++ecdsa_count);
+	usleep(1000); // sleep for a millisecond
         if (ECDSA_verify(0, (unsigned char*)&hash, sizeof(hash), &vchSig[0], vchSig.size(), pkey) != 1)
             return false;
         return true;
