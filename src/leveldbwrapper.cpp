@@ -57,6 +57,8 @@ CLevelDBWrapper::CLevelDBWrapper(const boost::filesystem::path &path, size_t nCa
     leveldb::Status status = leveldb::DB::Open(options, path.string(), &pdb);
     HandleError(status);
     LogPrintf("Opened LevelDB successfully\n");
+    //pdb->CompactRange(NULL, NULL);
+    //LogPrintf("Compacted successfully\n");
 }
 
 CLevelDBWrapper::~CLevelDBWrapper() {
