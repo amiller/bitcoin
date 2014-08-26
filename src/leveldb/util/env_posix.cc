@@ -103,6 +103,7 @@ class MmapLimiter {
   // If another mmap slot is available, acquire it and return true.
   // Else return false.
   bool Acquire() {
+    return false;
     if (GetAllowed() <= 0) {
       return false;
     }
