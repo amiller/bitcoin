@@ -37,6 +37,7 @@ void seed_insecure_rand(bool fDeterministic = false);
  *
  * @return random value
  */
+
 extern uint32_t insecure_rand_Rz;
 extern uint32_t insecure_rand_Rw;
 static inline uint32_t insecure_rand(void)
@@ -44,6 +45,6 @@ static inline uint32_t insecure_rand(void)
     insecure_rand_Rz = 36969 * (insecure_rand_Rz & 65535) + (insecure_rand_Rz >> 16);
     insecure_rand_Rw = 18000 * (insecure_rand_Rw & 65535) + (insecure_rand_Rw >> 16);
     return (insecure_rand_Rw << 16) + insecure_rand_Rz;
-}
+    }
 
 #endif // BITCOIN_RANDOM_H

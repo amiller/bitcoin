@@ -146,8 +146,30 @@ public:
             delete ppmutexOpenSSL[i];
         OPENSSL_free(ppmutexOpenSSL);
     }
+};
+
+CInit *instance_of_cinit = 0;
+ 
+extern "C"
+int crypto_global_init(void) {
+  instance_of_cinit = new CInit();
+  return 0;
 }
-instance_of_cinit;
+
+extern "C"
+int crypto_global_cleanup(void) {
+  if (instance_of_cinit)
+    delete instance_of_cinit;
+  return 0;
+}
+
+class CInit2
+{
+public:
+  CInit2() { crypto_global_init(); }
+  ~CInit2() { crypto_global_cleanup(); }
+} instance_of_cinit2;
+
 
 /**
  * LogPrintf() has been broken a couple of times now
