@@ -495,8 +495,8 @@ bool InitSanityCheck(void)
                   "information, visit https://en.bitcoin.it/wiki/OpenSSL_and_EC_Libraries");
         return false;
     }
-    if (!glibc_sanity_test() || !glibcxx_sanity_test())
-        return false;
+    //if (!glibc_sanity_test() || !glibcxx_sanity_test())
+    //    return false;
 
     return true;
 }
@@ -504,8 +504,12 @@ bool InitSanityCheck(void)
 /** Initialize bitcoin.
  *  @pre Parameters should be parsed and config file should be read.
  */
+#include <secp256k1.h>
 bool AppInit2(boost::thread_group& threadGroup)
 {
+  secp256k1_start(SECP256K1_START_SIGN);
+
+
     // ********************************************************* Step 1: setup
 #ifdef _MSC_VER
     // Turn off Microsoft heap dump noise
